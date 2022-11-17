@@ -13,6 +13,8 @@
 
 var current_num = 0;
 var last_was_correct = 1;
+var last_click_time = -1;
+var time_elapsed = -1;
 
 function draw_circles (index_to_highlight) {
     const canvas = document.getElementById('canvas');
@@ -61,14 +63,14 @@ x = function() {
     document.addEventListener('pointerlockchange', lockChangeAlert, false);
     document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
 
-    /*document.addEventListener("keydown", (e) => {
+    document.addEventListener("keydown", (e) => {
         if (e.code == "ArrowLeft") {
             sF = Math.max(0.2, sF - 0.2);
         } else if (e.code == "ArrowRight") {
             sF = Math.min(5, sF + 0.2)
         }
         drawStuff();
-    }, false);*/
+    }, false);
 
     
 
@@ -130,6 +132,15 @@ x = function() {
 
         current_num = (current_num + Math.floor(circles / 2) + 1) % circles;
         drawStuff();
+
+        
+        var current_time = Date.now();
+        
+        if (last_click_time != -1) {
+            time_elapsed = current_time - last_click_time;
+        }
+        last_click_time = current_time;
+
     })
 
     // resize the canvas to fill browser window dynamically
@@ -168,6 +179,7 @@ x = function() {
         } else {
             context.fillText("Previous click: Fail", 10, 90);
         }
+        context.fillText("Time to click: " + time_elapsed, 10, 110);
         
 
         context.beginPath();
