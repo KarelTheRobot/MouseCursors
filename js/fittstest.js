@@ -14,7 +14,11 @@
 var current_num = 0;
 var last_was_correct = 1;
 var last_click_time = -1;
-var time_elapsed = -1;
+var start_time = -1;
+var total_correct = 0;
+
+var game_is_active = false;
+var game_is_over = false;
 
 function draw_circles (index_to_highlight) {
     const canvas = document.getElementById('canvas');
@@ -57,20 +61,22 @@ x = function() {
 
     canvas.onclick = function() {
         console.log("hi");
-        canvas.requestPointerLock()
+        if (!game_is_over) {
+            canvas.requestPointerLock()
+        }
     };
 
     document.addEventListener('pointerlockchange', lockChangeAlert, false);
     document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
 
-    document.addEventListener("keydown", (e) => {
+    /*document.addEventListener("keydown", (e) => {
         if (e.code == "ArrowLeft") {
             sF = Math.max(0.2, sF - 0.2);
         } else if (e.code == "ArrowRight") {
             sF = Math.min(5, sF + 0.2)
         }
         drawStuff();
-    }, false);
+    }, false);*/
 
     
 
@@ -96,7 +102,6 @@ x = function() {
 
         virtualx += sF * dX;
         virtualy += sF * dY;
-        console.log(virtualx);
 
         if (virtualx < 0) {
             virtualx = canvas.width;
@@ -114,34 +119,84 @@ x = function() {
     }
 
     canvas.addEventListener("mousedown", (e) => {
-        let midX = canvas.width / 2;
-        let midY = canvas.height / 2;
-        
-        angle = current_num * 2 * Math.PI / (circles);
-        cX = midX + outer_radius * Math.cos(angle);
-        cY = midY + outer_radius * Math.sin(angle);
+        if (game_is_active) {
+            let midX = canvas.width / 2;
+            let midY = canvas.height / 2;
+            
+            angle = current_num * 2 * Math.PI / (circles);
+            cX = midX + outer_radius * Math.cos(angle);
+            cY = midY + outer_radius * Math.sin(angle);
 
-        console.log(cX, cY, virtualx, virtualy);
+            console.log(cX, cY, virtualx, virtualy);
 
-        dist_sq = Math.pow(cX - virtualx, 2) + Math.pow(cY - virtualy, 2)
-        if (dist_sq > inner_radius * inner_radius) {
-            last_was_correct = 0;
+            dist_sq = Math.pow(cX - virtualx, 2) + Math.pow(cY - virtualy, 2)
+            if (dist_sq > inner_radius * inner_radius) {
+                last_was_correct = 0;
+            } else {
+                last_was_correct = 1;
+                total_correct += 1;
+            }
+
+            //current_num = (current_num + Math.floor(circles / 2) + 1) % circles;
+            
+
+            if (current_num == 0) {
+                start_time = Date.now();
+            }
+
+            current_num += 1;
+
+            if (current_num == circles) {
+                end_game();
+            }
+
+            drawStuff();
+
+            
+            // var current_time = Date.now();
+            
+            // if (last_click_time != -1) {
+            //     time_elapsed = current_time - last_click_time;
+            // }
+            // last_click_time = current_time;
         } else {
-            last_was_correct = 1;
+            if (game_is_over) {
+                
+                location.href = "/";
+                console.log("redirecting");
+            } else {
+                init_game();
+            }
         }
-
-        current_num = (current_num + Math.floor(circles / 2) + 1) % circles;
-        drawStuff();
-
-        
-        var current_time = Date.now();
-        
-        if (last_click_time != -1) {
-            time_elapsed = current_time - last_click_time;
-        }
-        last_click_time = current_time;
-
     })
+
+    function init_game() {
+        current_num = 0;
+        last_was_correct = 1;
+        last_click_time = -1;
+        total_correct = 0;
+        game_is_active = true;
+    }
+
+    function end_game() {
+        end_time = Date.now();
+        time_elapsed = end_time - start_time;
+        average_time = time_elapsed / (circles - 1);
+
+        res = {
+            average_time: average_time,
+            total_correct: total_correct,
+        }
+
+        game_is_active = false;
+        game_is_over = true;
+        document.exitPointerLock();
+        console.log("ending game!");
+
+        $.post("/result", res, function(data) {
+            console.log("success!", data);
+        })
+    }
 
     // resize the canvas to fill browser window dynamically
     window.addEventListener('resize', resizeCanvas, false);
@@ -167,26 +222,33 @@ x = function() {
         }
         context.fillRect(0, 0, canvas.width, canvas.height);
 
-        draw_circles(current_num);
+        if (game_is_active) {
+            draw_circles(current_num);
 
-        context.font = "20px serif"
-        context.fillStyle = "black";
-        context.fillText("Press → to increase scale factor, ← to decrease, click to interact", 10, 30);
-        context.fillText("Window size: " + canvas.width + " " + canvas.height, 10, 50);
-        context.fillText("Current SF: " + (parseFloat(sF).toPrecision(2)), 10, 70);
-        if (last_was_correct) {
-            context.fillText("Previous click: Success", 10, 90);
+            context.font = "20px serif"
+            context.fillStyle = "black";
+            context.fillText("Press → to increase scale factor, ← to decrease, click to interact", 10, 30);
+            context.fillText("Window size: " + canvas.width + " " + canvas.height, 10, 50);
+            context.fillText("Current SF: " + (parseFloat(sF).toPrecision(2)), 10, 70);
+            if (last_was_correct) {
+                context.fillText("Previous click: Success", 10, 90);
+            } else {
+                context.fillText("Previous click: Fail", 10, 90);
+            }
+            //context.fillText("Time to click: " + time_elapsed, 10, 110);
+            
+            context.beginPath();
+            context.arc(virtualx, virtualy, 5, 0, 2 * Math.PI, false);
+            context.fillStyle = "black";
+            context.fill();
+            context.stroke();
         } else {
-            context.fillText("Previous click: Fail", 10, 90);
+            context.font = "20px serif"
+            context.fillStyle = "black";
+            context.fillText("Click anywhere to continue.", 100, 70);
         }
-        context.fillText("Time to click: " + time_elapsed, 10, 110);
-        
 
-        context.beginPath();
-        context.arc(virtualx, virtualy, 5, 0, 2 * Math.PI, false);
-        context.fillStyle = "black";
-        context.fill();
-        context.stroke();
+        
     }
 }
 
